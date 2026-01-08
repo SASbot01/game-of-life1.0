@@ -1,14 +1,10 @@
 import { Outlet } from "react-router-dom";
 import { SpaceNavigation } from "./SpaceNavigation";
 import { StatusBar } from "./StatusBar";
-import { ProfileRefresher } from "@/components/shared/ProfileRefresher";
 
 export function SpaceLayout() {
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Profile Data Refresher */}
-      <ProfileRefresher />
-
       {/* Top Status Bar */}
       <StatusBar />
 

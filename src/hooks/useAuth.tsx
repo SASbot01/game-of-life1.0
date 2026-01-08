@@ -56,8 +56,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     console.log('🔐 [Auth] Refreshing profile...');
     if (user) {
       const profileData = await fetchProfile(user.id);
-      setProfile(profileData);
-      console.log('🔐 [Auth] Profile refreshed:', profileData);
+      if (profileData) {
+        setProfile(profileData);
+        console.log('🔐 [Auth] Profile refreshed:', profileData);
+      } else {
+        console.warn('🔐 [Auth] Profile refresh returned null, keeping existing profile');
+        // Don't set profile to null if fetch fails - keep existing profile
+      }
     }
   };
 

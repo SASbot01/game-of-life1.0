@@ -46,6 +46,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import type { VaultMode } from "@/pages/TheVault";
 
 type Pocket = {
   id: string;
@@ -72,7 +73,11 @@ const pocketColors = [
   { name: "Chronos", value: "chronos" },
 ];
 
-export function VaultWalletTab() {
+interface VaultWalletTabProps {
+  vaultMode: VaultMode;
+}
+
+export function VaultWalletTab({ vaultMode }: VaultWalletTabProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [expandedWallet, setExpandedWallet] = useState<string | null>(null);
@@ -97,9 +102,9 @@ export function VaultWalletTab() {
     amount: "",
   });
 
-  // Fetch wallet-type assets (bank accounts, wallets)
+  // Fetch wallet-type assets (bank accounts, wallets) filtered by vault mode
   const { data: walletAssets = [] } = useQuery({
-    queryKey: ["wallet-assets", user?.id],
+    queryKey: ["wallet-assets", user?.id, vaultMode],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("finance_assets")
@@ -107,21 +112,31 @@ export function VaultWalletTab() {
         .eq("user_id", user?.id)
         .in("type", ["Bank Account", "Wallet", "Cash", "Checking", "Savings"]);
       if (error) throw error;
-      return data as WalletAsset[];
+
+      // Filter by vault_mode (with fallback for records without the field)
+      const filtered = (data as any[]).filter((item: any) =>
+        !item.vault_mode || item.vault_mode === vaultMode
+      );
+      return filtered as WalletAsset[];
     },
     enabled: !!user?.id,
   });
 
-  // Fetch pockets
+  // Fetch pockets filtered by vault mode
   const { data: pockets = [] } = useQuery({
-    queryKey: ["pockets", user?.id],
+    queryKey: ["pockets", user?.id, vaultMode],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("pockets")
         .select("*")
         .eq("user_id", user?.id);
       if (error) throw error;
-      return data as Pocket[];
+
+      // Filter by vault_mode (with fallback for records without the field)
+      const filtered = (data as any[]).filter((item: any) =>
+        !item.vault_mode || item.vault_mode === vaultMode
+      );
+      return filtered as Pocket[];
     },
     enabled: !!user?.id,
   });

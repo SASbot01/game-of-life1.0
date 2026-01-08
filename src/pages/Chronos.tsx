@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { TimeAnalytics } from "@/components/chronos/TimeAnalytics";
 import { UnifiedCalendarEvent, UnifiedEvent } from "@/components/chronos/UnifiedCalendarEvent";
+import { HabitCalendarEvent, HabitEvent } from "@/components/chronos/HabitCalendarEvent";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
@@ -58,6 +59,23 @@ export default function Chronos() {
     enabled: !!user?.id,
   });
 
+  // Fetch habits with scheduled times
+  const { data: habits = [] } = useQuery({
+    queryKey: ["habits-calendar", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("habits")
+        .select("*")
+        .eq("user_id", user?.id)
+        .eq("is_active", true)
+        .not("scheduled_time", "is", null);
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id,
+  });
+
   // Fetch recurring transactions for calendar
   const { data: recurringTransactions = [] } = useQuery({
     queryKey: ["recurring-transactions", user?.id],
@@ -95,11 +113,23 @@ export default function Chronos() {
 
     // Tasks as time blocks
     tasks.forEach((task) => {
+      // Type assertion for fields that will be added via migration
+      const taskWithTime = task as typeof task & { due_time?: string | null; duration?: number | null };
+      const startTime = taskWithTime.due_time || "09:00"; // Use due_time if available
+      const durationMinutes = taskWithTime.duration || 60;
+
+      // Calculate end time based on duration
+      const [hours, minutes] = startTime.split(":").map(Number);
+      const totalMinutes = hours * 60 + minutes + durationMinutes;
+      const endHours = Math.floor(totalMinutes / 60);
+      const endMinutes = totalMinutes % 60;
+      const endTime = `${endHours.toString().padStart(2, "0")}:${endMinutes.toString().padStart(2, "0")}`;
+
       events.push({
         id: `task-${task.id}`,
         title: task.title,
-        startTime: "09:00",
-        endTime: "10:00",
+        startTime,
+        endTime,
         module: "ops",
         origin: "task",
         metadata: { difficulty: task.difficulty, taskId: task.id },
@@ -108,6 +138,21 @@ export default function Chronos() {
 
     return events;
   }, [calendarEvents, tasks]);
+
+  // Build habit events (shown as compact lines)
+  const habitEvents: HabitEvent[] = useMemo(() => {
+    return habits.map((habit) => {
+      const habitWithTime = habit as typeof habit & { scheduled_time?: string | null };
+      return {
+        id: habit.id,
+        title: habit.name,
+        category: habit.category as "health" | "mana" | "stamina",
+        scheduledTime: habitWithTime.scheduled_time || "08:00",
+        xpReward: habit.xp_reward,
+        completed: false, // TODO: Check if completed today
+      };
+    });
+  }, [habits]);
 
   // All-day events (recurring payments)
   const allDayEvents: UnifiedEvent[] = useMemo(() => {
@@ -293,10 +338,10 @@ export default function Chronos() {
                       ? f === "bio"
                         ? "bg-bio text-bio-foreground"
                         : f === "ops"
-                        ? "bg-ops text-ops-foreground"
-                        : f === "vault"
-                        ? "bg-vault text-vault-foreground"
-                        : "bg-primary text-primary-foreground"
+                          ? "bg-ops text-ops-foreground"
+                          : f === "vault"
+                            ? "bg-vault text-vault-foreground"
+                            : "bg-primary text-primary-foreground"
                       : ""
                   }
                 >
@@ -314,13 +359,12 @@ export default function Chronos() {
               {filteredAllDayEvents.map((event) => (
                 <div
                   key={event.id}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity ${
-                    event.module === "vault"
-                      ? "bg-vault/20 text-vault border border-vault/30"
-                      : event.module === "bio"
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity ${event.module === "vault"
+                    ? "bg-vault/20 text-vault border border-vault/30"
+                    : event.module === "bio"
                       ? "bg-bio/20 text-bio border border-bio/30"
                       : "bg-ops/20 text-ops border border-ops/30"
-                  }`}
+                    }`}
                 >
                   <span>{event.title}</span>
                 </div>
@@ -354,6 +398,14 @@ export default function Chronos() {
                   >
                     <UnifiedCalendarEvent event={event} top={top} height={height} />
                   </div>
+                );
+              })}
+
+              {/* Habit Events (compact lines) */}
+              {habitEvents.map((habit) => {
+                const top = getEventPosition(habit.scheduledTime);
+                return (
+                  <HabitCalendarEvent key={habit.id} habit={habit} top={top} />
                 );
               })}
             </div>

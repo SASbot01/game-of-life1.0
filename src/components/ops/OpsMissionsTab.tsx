@@ -33,6 +33,7 @@ interface Task {
   category: string;
   duration: number;
   dueDate: string;
+  dueTime?: string; // Optional time in HH:mm format
   status: "backlog" | "todo" | "in_progress" | "done";
   difficulty: "easy" | "medium" | "hard" | "boss";
 }
@@ -74,6 +75,7 @@ export function OpsMissionsTab() {
     category: "",
     duration: "60",
     dueDate: "",
+    dueTime: "", // Add time field
     difficulty: "medium" as Task["difficulty"],
   });
 
@@ -89,12 +91,13 @@ export function OpsMissionsTab() {
       category: newTask.category || "General",
       duration: parseInt(newTask.duration) || 60,
       dueDate: newTask.dueDate || new Date().toISOString().split("T")[0],
+      dueTime: newTask.dueTime || undefined,
       status: "backlog",
       difficulty: newTask.difficulty,
     };
 
     setTasks([...tasks, task]);
-    setNewTask({ title: "", category: "", duration: "60", dueDate: "", difficulty: "medium" });
+    setNewTask({ title: "", category: "", duration: "60", dueDate: "", dueTime: "", difficulty: "medium" });
     setDialogOpen(false);
     toast({ title: "Mission Created", description: `"${task.title}" added to backlog` });
   };
@@ -102,15 +105,15 @@ export function OpsMissionsTab() {
   const moveTask = (taskId: string, newStatus: Task["status"]) => {
     const task = tasks.find(t => t.id === taskId);
     const wasNotDone = task?.status !== "done";
-    
+
     setTasks(tasks.map(t => (t.id === taskId ? { ...t, status: newStatus } : t)));
-    
+
     if (newStatus === "done" && wasNotDone && task) {
       // Trigger celebration effect
       import('canvas-confetti').then(({ default: confetti }) => {
-        const particleCount = task.difficulty === 'boss' ? 100 : 
-                              task.difficulty === 'hard' ? 60 : 
-                              task.difficulty === 'medium' ? 40 : 25;
+        const particleCount = task.difficulty === 'boss' ? 100 :
+          task.difficulty === 'hard' ? 60 :
+            task.difficulty === 'medium' ? 40 : 25;
         confetti({
           particleCount,
           spread: 70,
@@ -118,7 +121,7 @@ export function OpsMissionsTab() {
           colors: ['#00d4ff', '#ff0080', '#ffd700'],
         });
       });
-      
+
       toast({
         title: "🎮 Mission Complete!",
         description: `+${difficultyXP[task.difficulty]} XP earned`,
@@ -208,6 +211,16 @@ export function OpsMissionsTab() {
                   value={newTask.dueDate}
                   onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
                   className="bg-secondary border-border"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Due Time (optional)</Label>
+                <Input
+                  type="time"
+                  value={newTask.dueTime}
+                  onChange={(e) => setNewTask({ ...newTask, dueTime: e.target.value })}
+                  className="bg-secondary border-border font-mono"
+                  placeholder="HH:MM"
                 />
               </div>
               <Button

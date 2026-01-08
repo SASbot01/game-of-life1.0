@@ -36,6 +36,7 @@ interface Habit {
   last_completed_at: string | null;
   is_active: boolean;
   area_id: string | null;
+  scheduled_time?: string | null; // Optional time in HH:mm format
 }
 
 interface Area {
@@ -65,6 +66,7 @@ export function BioActionTab() {
     category: "health" as "health" | "mana" | "stamina",
     xp_reward: 10,
     area_id: "",
+    scheduled_time: "", // Add time field
   });
 
   const hp = profile?.hp ?? 100;
@@ -134,6 +136,7 @@ export function BioActionTab() {
         xp_reward: habit.xp_reward,
         hp_impact: 5,
         area_id: habit.area_id || null,
+        scheduled_time: habit.scheduled_time || null,
       });
       if (error) throw error;
     },
@@ -141,7 +144,7 @@ export function BioActionTab() {
       queryClient.invalidateQueries({ queryKey: ["habits"] });
       queryClient.invalidateQueries({ queryKey: ["area-habits"] });
       setDialogOpen(false);
-      setNewHabit({ name: "", category: "health", xp_reward: 10, area_id: "" });
+      setNewHabit({ name: "", category: "health", xp_reward: 10, area_id: "", scheduled_time: "" });
       toast.success("Habit created");
     },
     onError: () => toast.error("Failed to create habit"),
@@ -307,6 +310,16 @@ export function BioActionTab() {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Scheduled Time (optional)</label>
+                <Input
+                  type="time"
+                  value={newHabit.scheduled_time}
+                  onChange={(e) => setNewHabit({ ...newHabit, scheduled_time: e.target.value })}
+                  className="bg-background border-border font-mono"
+                  placeholder="HH:MM"
+                />
               </div>
               <Button
                 onClick={() => createHabitMutation.mutate(newHabit)}

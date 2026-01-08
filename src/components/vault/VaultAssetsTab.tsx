@@ -21,20 +21,22 @@ import { useAuth } from "@/hooks/useAuth";
 import { DateRangeFilter, DateRange, getDateRangeFilter } from "@/components/shared/DateRangeFilter";
 import { AnimatedNumber } from "@/components/shared/AnimatedNumber";
 import { format, eachMonthOfInterval, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import type { VaultMode } from "@/pages/TheVault";
 
 interface VaultAssetsTabProps {
   netWorth: number;
   totalAssets: number;
   totalLiabilities: number;
+  vaultMode: VaultMode;
 }
 
-export function VaultAssetsTab({ netWorth, totalAssets, totalLiabilities }: VaultAssetsTabProps) {
+export function VaultAssetsTab({ netWorth, totalAssets, totalLiabilities, vaultMode }: VaultAssetsTabProps) {
   const { user } = useAuth();
   const [dateRange, setDateRange] = useState<DateRange>("quarter");
 
-  // Fetch transactions for monthly summary
+  // Fetch transactions for monthly summary filtered by vault mode
   const { data: transactions = [] } = useQuery({
-    queryKey: ["transactions", user?.id, dateRange],
+    queryKey: ["transactions", user?.id, dateRange, vaultMode],
     queryFn: async () => {
       let query = supabase
         .from("transactions")
@@ -51,21 +53,31 @@ export function VaultAssetsTab({ netWorth, totalAssets, totalLiabilities }: Vaul
 
       const { data, error } = await query;
       if (error) throw error;
-      return data;
+
+      // Filter by vault_mode (with fallback for records without the field)
+      const filtered = (data as any[]).filter((item: any) =>
+        !item.vault_mode || item.vault_mode === vaultMode
+      );
+      return filtered;
     },
     enabled: !!user?.id,
   });
 
-  // Fetch assets for allocation
+  // Fetch assets for allocation filtered by vault mode
   const { data: assets = [] } = useQuery({
-    queryKey: ["finance-assets", user?.id],
+    queryKey: ["finance-assets", user?.id, vaultMode],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("finance_assets")
         .select("*")
         .eq("user_id", user?.id);
       if (error) throw error;
-      return data;
+
+      // Filter by vault_mode (with fallback for records without the field)
+      const filtered = (data as any[]).filter((item: any) =>
+        !item.vault_mode || item.vault_mode === vaultMode
+      );
+      return filtered;
     },
     enabled: !!user?.id,
   });
