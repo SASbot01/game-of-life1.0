@@ -4,6 +4,7 @@ import { StatusHeader } from '@/components/hud/StatusHeader';
 import { HudPanel } from '@/components/hud/HudPanel';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
+import { useLevelUp } from '@/hooks/useLevelUp';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -14,6 +15,7 @@ export default function Dashboard() {
   const { profile, user } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { awardXP } = useLevelUp();
 
   // Fetch active tasks
   const { data: activeTasks, isLoading: tasksLoading } = useQuery({
@@ -76,10 +78,12 @@ export default function Dashboard() {
     enabled: !!user?.id,
   });
 
-  // Complete task mutation
+  // Complete task mutation with level-up
   const completeTaskMutation = useMutation({
     mutationFn: async (taskId: string) => {
       const task = activeTasks?.find(t => t.id === taskId);
+
+      // Update task status
       const { error } = await supabase
         .from('tasks')
         .update({
@@ -90,22 +94,15 @@ export default function Dashboard() {
 
       if (error) throw error;
 
-      // Award XP to profile
-      if (task && profile) {
-        const newXp = profile.current_xp + task.xp_reward;
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update({ current_xp: newXp })
-          .eq('id', user?.id);
-
-        if (profileError) throw profileError;
+      // Award XP (handles level-up automatically)
+      if (task) {
+        await awardXP(task.xp_reward);
       }
 
       return task;
     },
     onSuccess: (task) => {
       queryClient.invalidateQueries({ queryKey: ['dashboard-tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['profile'] });
       toast.success(`Quest completed! +${task?.xp_reward || 0} XP`);
     },
     onError: () => {

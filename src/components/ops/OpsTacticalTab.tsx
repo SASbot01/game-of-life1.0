@@ -29,6 +29,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { useLevelUp } from "@/hooks/useLevelUp";
 import { toast } from "sonner";
 import { isToday, isPast, isThisWeek } from "date-fns";
 import { filterVisibleTasks } from "@/lib/taskFilters";
@@ -68,20 +69,21 @@ const xpMap: Record<TaskDifficulty, number> = { easy: 10, medium: 25, hard: 50, 
 export function OpsTacticalTab() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  
+  const { awardXP } = useLevelUp();
+
   // Dialog states
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
-  
+
   // Filter states
   const [projectFilter, setProjectFilter] = useState<string>("all");
   const [areaFilter, setAreaFilter] = useState<string>("all");
   const [energyFilter, setEnergyFilter] = useState<EnergyFilter>("all");
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
-  
+
   // Form states
   const [newTask, setNewTask] = useState({
     title: "",
@@ -155,51 +157,32 @@ export function OpsTacticalTab() {
     onError: () => toast.error("Failed to create mission"),
   });
 
-  // Update task mutation (for status changes)
+  // Update task mutation (for status changes) with level-up
   const updateTaskMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: TaskStatus }) => {
       const task = tasks.find(t => t.id === id);
       const isCompletion = status === 'done' && task?.status !== 'done';
-      
+
       const { error } = await supabase.from("tasks").update({
         status,
         completed_at: status === "done" ? new Date().toISOString() : null
       }).eq("id", id);
-      
+
       if (error) throw error;
+
+      // Award XP if completing task (handles level-up automatically)
+      if (isCompletion && task) {
+        await awardXP(task.xp_reward);
+      }
+
       return { task, isCompletion };
     },
-    onSuccess: async ({ task, isCompletion }) => {
+    onSuccess: ({ task, isCompletion }) => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       queryClient.invalidateQueries({ queryKey: ["tactical-metrics"] });
-      
+
       if (isCompletion && task) {
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('current_xp')
-          .eq('id', user?.id)
-          .single();
-        
-        if (profileData) {
-          await supabase
-            .from('profiles')
-            .update({ current_xp: profileData.current_xp + task.xp_reward })
-            .eq('id', user?.id);
-          
-          queryClient.invalidateQueries({ queryKey: ['profiles'] });
-          
-          import('canvas-confetti').then(({ default: confetti }) => {
-            const particleCount = task.xp_reward >= 100 ? 100 : task.xp_reward >= 50 ? 60 : 30;
-            confetti({
-              particleCount,
-              spread: 70,
-              origin: { y: 0.4 },
-              colors: ['#00d4ff', '#ff0080', '#ffd700'],
-            });
-          });
-          
-          toast.success(`🎮 Mission Complete! +${task.xp_reward} XP`, { duration: 3000 });
-        }
+        toast.success(`🎮 Mission Complete! +${task.xp_reward} XP`, { duration: 3000 });
       } else {
         toast.success("Task updated");
       }
@@ -277,24 +260,24 @@ export function OpsTacticalTab() {
 
   // Filter tasks
   const visibleTasks = filterVisibleTasks(tasks);
-  
+
   const filteredTasks = visibleTasks.filter((task) => {
     // Area filter (via project)
     if (areaFilter !== "all") {
       const project = projects.find(p => p.id === task.project_id);
       if (!project || project.area_id !== areaFilter) return false;
     }
-    
+
     // Project filter
     if (projectFilter !== "all" && task.project_id !== projectFilter) return false;
-    
+
     // Energy filter
     if (energyFilter !== "all") {
       if (energyFilter === "low" && task.difficulty !== "easy") return false;
       if (energyFilter === "medium" && task.difficulty !== "medium") return false;
       if (energyFilter === "high" && task.difficulty !== "hard" && task.difficulty !== "boss") return false;
     }
-    
+
     // Time filter
     if (timeFilter !== "all" && task.due_date) {
       const dueDate = new Date(task.due_date);
@@ -334,8 +317,8 @@ export function OpsTacticalTab() {
           viewMode={viewMode}
           setViewMode={setViewMode}
         />
-        
-        <Button 
+
+        <Button
           onClick={() => setIsDialogOpen(true)}
           className="bg-ops/20 text-ops border border-ops/30 hover:bg-ops/30"
         >

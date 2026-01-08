@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { Heart, Droplets, Zap, CheckCircle2, Plus } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useLevelUp } from "@/hooks/useLevelUp";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,6 +58,7 @@ const categoryStyles = {
 export function BioActionTab() {
   const { user, profile } = useAuth();
   const queryClient = useQueryClient();
+  const { awardXP } = useLevelUp();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newHabit, setNewHabit] = useState({
     name: "",
@@ -145,7 +147,7 @@ export function BioActionTab() {
     onError: () => toast.error("Failed to create habit"),
   });
 
-  // Complete habit mutation with satisfying XP gain
+  // Complete habit mutation with level-up
   const completeHabitMutation = useMutation({
     mutationFn: async (habit: Habit) => {
       // Create habit log
@@ -170,37 +172,23 @@ export function BioActionTab() {
 
       if (habitError) throw habitError;
 
-      // Update user XP and HP with animation
+      // Update HP
       if (profile) {
-        const newXp = (profile.current_xp || 0) + habit.xp_reward;
         const newHp = Math.min((profile.hp || 100) + habit.hp_impact, profile.max_hp || 100);
-
         await supabase
           .from("profiles")
-          .update({
-            current_xp: newXp,
-            hp: newHp,
-          })
+          .update({ hp: newHp })
           .eq("id", user?.id);
       }
+
+      // Award XP (handles level-up automatically)
+      await awardXP(habit.xp_reward);
 
       return habit;
     },
     onSuccess: (habit) => {
       queryClient.invalidateQueries({ queryKey: ["habits"] });
       queryClient.invalidateQueries({ queryKey: ["habit-logs-today"] });
-      queryClient.invalidateQueries({ queryKey: ["profiles"] });
-      
-      // Trigger celebration effect
-      import('canvas-confetti').then(({ default: confetti }) => {
-        confetti({
-          particleCount: 25 + (habit.xp_reward * 2),
-          spread: 60,
-          origin: { y: 0.4 },
-          colors: ['#00d4ff', '#ff0080', '#ffd700'],
-          scalar: 0.8,
-        });
-      });
 
       toast.success(`🎮 +${habit.xp_reward} XP earned!`, {
         description: `Streak: ${habit.streak_current + 1} days 🔥`,
