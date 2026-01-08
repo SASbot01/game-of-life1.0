@@ -84,30 +84,23 @@ export function VaultAssetsTab({ netWorth, totalAssets, totalLiabilities }: Vaul
     return { income, expenses, savings, savingsRate };
   }, [transactions]);
 
-  // Net worth history (simulated based on current data) - extended to 12 months
+  // Net worth history (real data only) - extended to 12 months
   const netWorthHistory = useMemo(() => {
     const months = eachMonthOfInterval({
       start: subMonths(new Date(), 11),
       end: new Date(),
     });
 
-    const hasRealData = transactions.length > 0;
-    let runningTotal = netWorth > 0 ? netWorth - monthlySummary.savings * 12 : 15000;
+    let runningTotal = netWorth > 0 ? netWorth - monthlySummary.savings * 12 : 0;
 
-    return months.map((month, index) => {
-      if (hasRealData) {
-        runningTotal += monthlySummary.savings || 0;
-      } else {
-        // Sample growth pattern
-        const baseGrowth = 800 + Math.sin(index * 0.5) * 300;
-        runningTotal += baseGrowth + Math.random() * 200;
-      }
+    return months.map((month) => {
+      runningTotal += monthlySummary.savings || 0;
       return {
         month: format(month, "MMM"),
         value: Math.max(0, runningTotal),
       };
     });
-  }, [netWorth, monthlySummary.savings, transactions.length]);
+  }, [netWorth, monthlySummary.savings]);
 
   // Monthly burn rate (last 12 months expenses) - real data only
   const burnRateData = useMemo(() => {
@@ -134,7 +127,7 @@ export function VaultAssetsTab({ netWorth, totalAssets, totalLiabilities }: Vaul
     });
   }, [transactions]);
 
-  // Asset allocation from real data - with sample data fallback
+  // Asset allocation from real data only
   const assetAllocation = useMemo(() => {
     const colors = [
       "hsl(43 100% 50%)",
@@ -145,14 +138,7 @@ export function VaultAssetsTab({ netWorth, totalAssets, totalLiabilities }: Vaul
     ];
 
     if (assets.length === 0) {
-      // Sample allocation data
-      return [
-        { name: "Stocks", value: 18500, color: colors[0] },
-        { name: "Crypto", value: 8200, color: colors[1] },
-        { name: "Cash", value: 12000, color: colors[2] },
-        { name: "Real Estate", value: 25000, color: colors[3] },
-        { name: "Bonds", value: 6300, color: colors[4] },
-      ];
+      return [];
     }
 
     const assetsByType: Record<string, number> = {};
