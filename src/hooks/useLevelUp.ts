@@ -5,7 +5,7 @@ import confetti from 'canvas-confetti';
 import { useQueryClient } from '@tanstack/react-query';
 
 export function useLevelUp() {
-    const { profile, user } = useAuth();
+    const { profile, user, refreshProfile } = useAuth();
     const queryClient = useQueryClient();
 
     const awardXP = async (xpAmount: number) => {
@@ -42,8 +42,12 @@ export function useLevelUp() {
 
         if (error) throw error;
 
-        // Invalidate profile query to refresh UI
+        // Refresh profile in useAuth to update UI
+        await refreshProfile();
+
+        // Invalidate profile query to refresh UI (for components using React Query)
         queryClient.invalidateQueries({ queryKey: ['profile'] });
+        queryClient.invalidateQueries({ queryKey: ['profiles'] });
 
         // Celebration if leveled up
         if (didLevelUp) {

@@ -54,8 +54,8 @@ interface AddTaskModalProps {
   showTrigger?: boolean;
 }
 
-export function AddTaskModal({ 
-  defaultAreaId, 
+export function AddTaskModal({
+  defaultAreaId,
   defaultProjectId,
   isOpen: controlledOpen,
   onOpenChange,
@@ -65,7 +65,7 @@ export function AddTaskModal({
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [internalOpen, setInternalOpen] = useState(false);
-  
+
   // Use controlled or uncontrolled state
   const isOpen = controlledOpen !== undefined ? controlledOpen : internalOpen;
   const setIsOpen = (open: boolean) => {
@@ -78,7 +78,7 @@ export function AddTaskModal({
       onClose();
     }
   };
-  
+
   const [formData, setFormData] = useState({
     area_id: defaultAreaId || "",
     project_id: defaultProjectId || "",
@@ -145,13 +145,14 @@ export function AddTaskModal({
   }, [formData.area_id, formData.project_id, allProjects]);
 
   // Calculate XP based on time estimate
-  const calculatedXp = formData.time_estimate 
+  const calculatedXp = formData.time_estimate
     ? timeXpMap[formData.time_estimate] || xpMap[formData.difficulty]
     : xpMap[formData.difficulty];
 
   const createTaskMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("tasks").insert({
+      // Create the task
+      const { data: taskData, error: taskError } = await supabase.from("tasks").insert({
         user_id: user?.id,
         title: formData.title,
         description: formData.description || null,
@@ -162,14 +163,49 @@ export function AddTaskModal({
         assignee: formData.assignee || null,
         xp_reward: calculatedXp,
         status: "todo",
-      });
-      if (error) throw error;
+      }).select().single();
+
+      if (taskError) throw taskError;
+
+      // If task has a due date, create a calendar event
+      if (formData.due_date && taskData) {
+        const dueDate = new Date(formData.due_date);
+
+        // Set default time to 9 AM if no time specified
+        dueDate.setHours(9, 0, 0, 0);
+
+        // Calculate end time based on time estimate or default 1 hour
+        const endDate = new Date(dueDate);
+        if (formData.time_estimate) {
+          const hours = parseFloat(formData.time_estimate.replace('h', '').replace('m', '')) || 1;
+          endDate.setHours(endDate.getHours() + (formData.time_estimate.includes('m') ? hours / 60 : hours));
+        } else {
+          endDate.setHours(endDate.getHours() + 1);
+        }
+
+        const { error: eventError } = await supabase.from("calendar_events").insert({
+          user_id: user?.id,
+          title: `📋 ${formData.title}`,
+          description: formData.description || null,
+          start_time: dueDate.toISOString(),
+          end_time: endDate.toISOString(),
+          module: "ops",
+          origin_type: "task",
+          origin_id: taskData.id,
+        });
+
+        if (eventError) {
+          console.error("Failed to create calendar event:", eventError);
+          // Don't throw - task was created successfully
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       queryClient.invalidateQueries({ queryKey: ["areas-with-stats"] });
       queryClient.invalidateQueries({ queryKey: ["projects-with-stats"] });
       queryClient.invalidateQueries({ queryKey: ["area-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["calendar-events"] });
       setIsOpen(false);
       setFormData({
         area_id: defaultAreaId || "",
@@ -181,7 +217,7 @@ export function AddTaskModal({
         due_date: "",
         difficulty: "medium",
       });
-      toast.success("Mission created");
+      toast.success(formData.due_date ? "Mission created and added to calendar" : "Mission created");
     },
     onError: () => toast.error("Failed to create mission"),
   });
@@ -191,13 +227,13 @@ export function AddTaskModal({
       <DialogHeader>
         <DialogTitle className="font-display text-ops">CREATE MISSION</DialogTitle>
       </DialogHeader>
-      
+
       <div className="space-y-4 pt-4">
         {/* Area Selection */}
         <div>
           <label className="text-xs text-muted-foreground mb-1 block">Area</label>
-          <Select 
-            value={formData.area_id} 
+          <Select
+            value={formData.area_id}
             onValueChange={(v) => setFormData({ ...formData, area_id: v === "none" ? "" : v, project_id: "" })}
           >
             <SelectTrigger className="bg-background border-border">
@@ -215,8 +251,8 @@ export function AddTaskModal({
         {/* Project Selection (Cascading) */}
         <div>
           <label className="text-xs text-muted-foreground mb-1 block">Project</label>
-          <Select 
-            value={formData.project_id} 
+          <Select
+            value={formData.project_id}
             onValueChange={(v) => setFormData({ ...formData, project_id: v === "none" ? "" : v })}
             disabled={formData.area_id === "" && filteredProjects.length === 0}
           >
