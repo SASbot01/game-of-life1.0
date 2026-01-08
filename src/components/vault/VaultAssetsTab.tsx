@@ -109,34 +109,23 @@ export function VaultAssetsTab({ netWorth, totalAssets, totalLiabilities }: Vaul
     });
   }, [netWorth, monthlySummary.savings, transactions.length]);
 
-  // Monthly burn rate (last 12 months expenses) - with sample data
+  // Monthly burn rate (last 12 months expenses) - real data only
   const burnRateData = useMemo(() => {
     const months = eachMonthOfInterval({
       start: subMonths(new Date(), 11),
       end: new Date(),
     });
 
-    const hasRealData = transactions.length > 0;
-
-    return months.map((month, index) => {
+    return months.map((month) => {
       const monthStart = startOfMonth(month);
       const monthEnd = endOfMonth(month);
-      
+
       const monthExpenses = transactions
         .filter((t) => {
           const transDate = new Date(t.date);
           return t.type === "expense" && transDate >= monthStart && transDate <= monthEnd;
         })
         .reduce((sum, t) => sum + Number(t.amount), 0);
-
-      // Sample data if no real expenses
-      if (!hasRealData || monthExpenses === 0) {
-        const baseExpense = 2500 + Math.sin(index * 0.7) * 500;
-        return {
-          month: format(month, "MMM"),
-          expenses: Math.round(baseExpense + Math.random() * 400),
-        };
-      }
 
       return {
         month: format(month, "MMM"),
@@ -202,9 +191,8 @@ export function VaultAssetsTab({ netWorth, totalAssets, totalLiabilities }: Vaul
             Net Worth
           </span>
           <p
-            className={`font-display text-5xl mt-2 ${
-              netWorth >= 0 ? "text-vault text-glow-vault" : "text-bio text-glow-bio"
-            }`}
+            className={`font-display text-5xl mt-2 ${netWorth >= 0 ? "text-vault text-glow-vault" : "text-bio text-glow-bio"
+              }`}
           >
             {netWorth >= 0 ? "+" : "-"}
             <AnimatedNumber value={Math.abs(netWorth)} prefix="$" className="font-display" />
@@ -237,8 +225,8 @@ export function VaultAssetsTab({ netWorth, totalAssets, totalLiabilities }: Vaul
             Financial Health
           </span>
           {(() => {
-            const healthScore = totalLiabilities === 0 
-              ? 100 
+            const healthScore = totalLiabilities === 0
+              ? 100
               : Math.min(100, Math.max(0, Math.round((totalAssets / (totalAssets + totalLiabilities)) * 100)));
             const healthColor = healthScore >= 70 ? "text-vault" : healthScore >= 40 ? "text-ops" : "text-bio";
             return (
@@ -300,9 +288,9 @@ export function VaultAssetsTab({ netWorth, totalAssets, totalLiabilities }: Vaul
               <stat.icon className={`w-4 h-4 ${stat.color}`} />
             </div>
             <p className={`font-mono text-2xl ${stat.color}`}>
-              <AnimatedNumber 
-                value={Math.abs(stat.value)} 
-                prefix={stat.prefix} 
+              <AnimatedNumber
+                value={Math.abs(stat.value)}
+                prefix={stat.prefix}
                 suffix={stat.suffix}
                 decimals={stat.suffix === "%" ? 1 : 0}
               />
@@ -475,9 +463,9 @@ export function VaultAssetsTab({ netWorth, totalAssets, totalLiabilities }: Vaul
           <div className="flex justify-between items-center">
             <span className="text-sm text-muted-foreground">Avg Monthly Burn</span>
             <span className="font-mono text-lg text-bio">
-              <AnimatedNumber 
-                value={burnRateData.reduce((sum, m) => sum + m.expenses, 0) / Math.max(1, burnRateData.length)} 
-                prefix="$" 
+              <AnimatedNumber
+                value={burnRateData.reduce((sum, m) => sum + m.expenses, 0) / Math.max(1, burnRateData.length)}
+                prefix="$"
               />
             </span>
           </div>
