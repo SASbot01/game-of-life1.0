@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Heart, Zap, Coins, User, Settings, LogOut, Menu } from 'lucide-react';
+import { Heart, Zap, Coins, User, Settings, LogOut, Menu, Camera } from 'lucide-react';
 import { StatBar } from './StatBar';
 import { useAuth } from '@/hooks/useAuth';
 import { Link } from 'react-router-dom';
@@ -12,9 +13,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { AvatarUploadModal } from '@/components/profile/AvatarUploadModal';
 
 export function StatusHeader() {
   const { profile, signOut } = useAuth();
+  const [avatarModalOpen, setAvatarModalOpen] = useState(false);
 
   if (!profile) return null;
 
@@ -28,20 +31,31 @@ export function StatusHeader() {
         <div className="flex items-center justify-between gap-4">
           {/* Avatar & Level */}
           <div className="flex items-center gap-3">
-            <div className="relative">
-              <Avatar className="h-12 w-12 border-2 border-primary/50 shadow-neon-cyan">
-                <AvatarImage src={profile.avatar_url || undefined} />
-                <AvatarFallback className="bg-background-elevated text-primary font-bold">
-                  {profile.username?.charAt(0).toUpperCase() || 'P'}
-                </AvatarFallback>
-              </Avatar>
+            <div className="relative group">
+              <div
+                className="cursor-pointer transition-transform hover:scale-105"
+                onClick={() => setAvatarModalOpen(true)}
+              >
+                <Avatar className="h-12 w-12 border-2 border-primary/50 shadow-neon-cyan">
+                  <AvatarImage src={profile.avatar_url || undefined} />
+                  <AvatarFallback className="bg-background-elevated text-primary font-bold">
+                    {profile.username?.charAt(0).toUpperCase() || 'P'}
+                  </AvatarFallback>
+                </Avatar>
+                {/* Upload Overlay */}
+                <div
+                  className="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <Camera className="w-4 h-4 text-white" />
+                </div>
+              </div>
               <div className="absolute -bottom-1 -right-1 bg-accent text-accent-foreground text-xs font-bold px-1.5 py-0.5 rounded-full shadow-neon-gold">
                 {profile.level}
               </div>
             </div>
             <div className="hidden sm:block">
-              <p className="font-semibold text-foreground">{profile.username || 'Player'}</p>
-              <p className="text-xs text-muted-foreground">Level {profile.level}</p>
+              <p className="font-semibold text-foreground">{profile.username || 'OPERATOR'}</p>
+              <p className="text-xs text-muted-foreground">Level {profile.level} • {profile.current_xp}/{profile.max_xp_for_next_level} XP</p>
             </div>
           </div>
 
@@ -75,9 +89,9 @@ export function StatusHeader() {
             <div className="flex items-center gap-2 bg-accent/10 border border-accent/30 rounded-lg px-3 py-2">
               <Coins className="h-4 w-4 text-accent" />
               <span className="stat-number text-accent text-glow-gold font-semibold">
-                {Number(profile.credits).toLocaleString('en-US', { 
+                {Number(profile.credits).toLocaleString('en-US', {
                   minimumFractionDigits: 0,
-                  maximumFractionDigits: 0 
+                  maximumFractionDigits: 0
                 })}
               </span>
             </div>
@@ -103,7 +117,7 @@ export function StatusHeader() {
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   onClick={signOut}
                   className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive"
                 >
@@ -139,6 +153,12 @@ export function StatusHeader() {
           </div>
         </div>
       </div>
+
+      {/* Avatar Upload Modal */}
+      <AvatarUploadModal
+        open={avatarModalOpen}
+        onOpenChange={setAvatarModalOpen}
+      />
     </motion.header>
   );
 }

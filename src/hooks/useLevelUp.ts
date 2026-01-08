@@ -33,7 +33,9 @@ export function useLevelUp() {
             // Level up!
             const remainingXp = newXp - profile.max_xp_for_next_level;
             newLevel = profile.level + 1;
-            const newMaxXp = Math.floor(profile.max_xp_for_next_level * 1.5);
+            // Linear progression: Level 1 = 100, Level 2 = 150, Level 3 = 200, etc.
+            // Formula: 100 + (level * 50)
+            const newMaxXp = 100 + (newLevel * 50);
 
             updates = {
                 current_xp: remainingXp,

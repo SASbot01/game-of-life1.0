@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { 
-  Upload, Heart, Crosshair, Gem, Zap, Calendar, CheckCircle2, 
-  Shield, Sword, Target, TrendingUp, Flame, Star, Activity
+import {
+  Upload, Heart, Crosshair, Gem, Zap, Calendar, CheckCircle2,
+  Shield, Sword, Target, TrendingUp, Flame, Star, Activity, Camera
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -25,10 +25,12 @@ import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { AnimatedNumber } from "@/components/shared/AnimatedNumber";
 import { CommandCenter } from "./CommandCenter";
 import { AreaROIDashboard } from "./AreaROIDashboard";
+import { AvatarUploadModal } from "@/components/profile/AvatarUploadModal";
 
 export function CharacterSheet() {
   const { profile, user } = useAuth();
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null);
+  const [avatarModalOpen, setAvatarModalOpen] = useState(false);
 
   const hp = profile?.hp ?? 100;
   const maxHp = profile?.max_hp ?? 100;
@@ -133,19 +135,19 @@ export function CharacterSheet() {
   const xpProgress = maxXp > 0 ? (currentXp / maxXp) * 100 : 0;
 
   // Stat card component
-  const StatCard = ({ 
-    icon: Icon, 
-    label, 
-    value, 
-    subValue, 
-    color, 
-    glowClass 
-  }: { 
-    icon: any; 
-    label: string; 
-    value: string | number; 
-    subValue?: string; 
-    color: string; 
+  const StatCard = ({
+    icon: Icon,
+    label,
+    value,
+    subValue,
+    color,
+    glowClass
+  }: {
+    icon: any;
+    label: string;
+    value: string | number;
+    subValue?: string;
+    color: string;
     glowClass: string;
   }) => (
     <motion.div
@@ -154,16 +156,16 @@ export function CharacterSheet() {
         "relative p-4 rounded-lg border overflow-hidden",
         `bg-${color}/10 border-${color}/30`
       )}
-      style={{ 
+      style={{
         background: `linear-gradient(135deg, hsl(var(--${color}) / 0.1), transparent)`,
-        borderColor: `hsl(var(--${color}) / 0.3)` 
+        borderColor: `hsl(var(--${color}) / 0.3)`
       }}
     >
       <div className="absolute top-0 right-0 w-20 h-20 opacity-5">
         <Icon className="w-full h-full" />
       </div>
       <div className="flex items-center gap-3">
-        <div 
+        <div
           className="p-2 rounded-lg"
           style={{ background: `hsl(var(--${color}) / 0.2)` }}
         >
@@ -171,7 +173,7 @@ export function CharacterSheet() {
         </div>
         <div>
           <p className="text-xs text-muted-foreground uppercase tracking-wider">{label}</p>
-          <p 
+          <p
             className={cn("font-mono text-xl font-bold", glowClass)}
             style={{ color: `hsl(var(--${color}))` }}
           >
@@ -192,9 +194,9 @@ export function CharacterSheet() {
   // If an area is selected, show the ROI Dashboard
   if (selectedAreaId) {
     return (
-      <AreaROIDashboard 
-        areaId={selectedAreaId} 
-        onBack={() => setSelectedAreaId(null)} 
+      <AreaROIDashboard
+        areaId={selectedAreaId}
+        onBack={() => setSelectedAreaId(null)}
       />
     );
   }
@@ -211,8 +213,11 @@ export function CharacterSheet() {
       >
         <div className="flex items-center gap-6">
           {/* Avatar */}
-          <div className="relative">
-            <div className="avatar-frame w-24 h-24">
+          <div className="relative group">
+            <div
+              className="avatar-frame w-24 h-24 cursor-pointer transition-transform hover:scale-105"
+              onClick={() => setAvatarModalOpen(true)}
+            >
               <div className="avatar-frame-inner w-full h-full flex items-center justify-center">
                 {profile?.avatar_url ? (
                   <img
@@ -225,6 +230,16 @@ export function CharacterSheet() {
                     <Upload className="w-6 h-6 text-muted-foreground" />
                   </div>
                 )}
+              </div>
+            </div>
+            {/* Upload Overlay */}
+            <div
+              className="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+              onClick={() => setAvatarModalOpen(true)}
+            >
+              <div className="text-center">
+                <Camera className="w-6 h-6 text-white mx-auto mb-1" />
+                <p className="text-xs text-white font-mono">UPLOAD</p>
               </div>
             </div>
             <div className="absolute -bottom-2 -right-2 bg-primary text-primary-foreground text-xs font-mono font-bold px-2 py-1 rounded-full border-2 border-background">
@@ -240,7 +255,7 @@ export function CharacterSheet() {
               </h1>
               <Badge icon={Star} text="ACTIVE" color="primary" />
             </div>
-            
+
             {/* XP Bar */}
             <div className="space-y-1 max-w-md">
               <div className="flex justify-between text-xs font-mono">
@@ -285,40 +300,40 @@ export function CharacterSheet() {
             CORE ATTRIBUTES
           </h3>
 
-          <StatCard 
-            icon={Heart} 
-            label="VITALITY" 
-            value={`${hp}/${maxHp}`} 
-            subValue="HP" 
-            color="bio" 
-            glowClass="text-glow-bio" 
-          />
-          
-          <StatCard 
-            icon={Crosshair} 
-            label="RANK" 
-            value={`LVL ${level}`} 
-            subValue={`${totalXpEarned} Total XP`}
-            color="ops" 
-            glowClass="text-glow-ops" 
-          />
-          
-          <StatCard 
-            icon={Gem} 
-            label="WEALTH" 
-            value={`¤${Number(credits).toLocaleString()}`} 
-            subValue="Credits"
-            color="vault" 
-            glowClass="text-glow-vault" 
+          <StatCard
+            icon={Heart}
+            label="VITALITY"
+            value={`${hp}/${maxHp}`}
+            subValue="HP"
+            color="bio"
+            glowClass="text-glow-bio"
           />
 
-          <StatCard 
-            icon={Sword} 
-            label="POWER" 
-            value={completedTasks} 
+          <StatCard
+            icon={Crosshair}
+            label="RANK"
+            value={`LVL ${level}`}
+            subValue={`${totalXpEarned} Total XP`}
+            color="ops"
+            glowClass="text-glow-ops"
+          />
+
+          <StatCard
+            icon={Gem}
+            label="WEALTH"
+            value={`¤${Number(credits).toLocaleString()}`}
+            subValue="Credits"
+            color="vault"
+            glowClass="text-glow-vault"
+          />
+
+          <StatCard
+            icon={Sword}
+            label="POWER"
+            value={completedTasks}
             subValue="Missions Complete"
-            color="primary" 
-            glowClass="" 
+            color="primary"
+            glowClass=""
           />
         </motion.div>
 
@@ -389,15 +404,15 @@ export function CharacterSheet() {
                       <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <XAxis 
-                    dataKey="day" 
-                    stroke="hsl(var(--muted-foreground))" 
+                  <XAxis
+                    dataKey="day"
+                    stroke="hsl(var(--muted-foreground))"
                     fontSize={10}
                     tickLine={false}
                     axisLine={false}
                   />
-                  <YAxis 
-                    stroke="hsl(var(--muted-foreground))" 
+                  <YAxis
+                    stroke="hsl(var(--muted-foreground))"
                     fontSize={10}
                     tickLine={false}
                     axisLine={false}
@@ -490,6 +505,12 @@ export function CharacterSheet() {
           </div>
         </motion.div>
       </div>
+
+      {/* Avatar Upload Modal */}
+      <AvatarUploadModal
+        open={avatarModalOpen}
+        onOpenChange={setAvatarModalOpen}
+      />
     </div>
   );
 }
@@ -497,9 +518,9 @@ export function CharacterSheet() {
 // Helper Components
 function Badge({ icon: Icon, text, color }: { icon: any; text: string; color: string }) {
   return (
-    <div 
+    <div
       className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-mono"
-      style={{ 
+      style={{
         background: `hsl(var(--${color}) / 0.2)`,
         color: `hsl(var(--${color}))`
       }}
@@ -513,7 +534,7 @@ function Badge({ icon: Icon, text, color }: { icon: any; text: string; color: st
 function QuickStat({ icon: Icon, value, label, color }: { icon: any; value: string | number; label: string; color: string }) {
   return (
     <div className="text-center">
-      <div 
+      <div
         className="w-12 h-12 rounded-lg flex items-center justify-center mx-auto mb-1"
         style={{ background: `hsl(var(--${color}) / 0.2)` }}
       >
