@@ -82,7 +82,7 @@ serve(async (req) => {
     if (timeMax) calendarUrl.searchParams.set("timeMax", timeMax);
     calendarUrl.searchParams.set("singleEvents", "true");
     calendarUrl.searchParams.set("orderBy", "startTime");
-    calendarUrl.searchParams.set("maxResults", "100");
+    calendarUrl.searchParams.set("maxResults", "250");
 
     const eventsResponse = await fetch(calendarUrl.toString(), {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -95,21 +95,41 @@ serve(async (req) => {
       throw new Error(eventsData.error.message);
     }
 
-    // Transform events
+    // Delete existing Google Calendar events for this user in the time range
+    await supabase
+      .from("calendar_events")
+      .delete()
+      .eq("user_id", userId)
+      .eq("origin_type", "google_calendar");
+
+    // Transform and insert events
     const events = (eventsData.items || []).map((event: any) => ({
-      id: event.id,
+      user_id: userId,
       title: event.summary || "Untitled",
       description: event.description || null,
       start_time: event.start.dateTime || event.start.date,
-      end_time: event.end.dateTime || event.end.date,
+      end_time: event.end?.dateTime || event.end?.date || null,
       is_all_day: !event.start.dateTime,
+      module: "chronos",
       origin_type: "google_calendar",
       origin_id: event.id,
     }));
 
-    console.log(`Fetched ${events.length} events from Google Calendar`);
+    // Insert events in batches
+    if (events.length > 0) {
+      const { error: insertError } = await supabase
+        .from("calendar_events")
+        .insert(events);
 
-    return new Response(JSON.stringify({ events }), {
+      if (insertError) {
+        console.error("Error inserting events:", insertError);
+        throw new Error("Failed to save events to database");
+      }
+    }
+
+    console.log(`Synced ${events.length} events from Google Calendar for user ${userId}`);
+
+    return new Response(JSON.stringify({ events, count: events.length }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: any) {

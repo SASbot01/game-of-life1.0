@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { DollarSign, CheckSquare, Heart, Calendar } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-export type EventOrigin = "task" | "transaction" | "habit" | "manual";
+export type EventOrigin = "task" | "transaction" | "habit" | "manual" | "google_calendar";
 
 export interface UnifiedEvent {
   id: string;
@@ -60,6 +60,7 @@ const originIcons = {
   transaction: DollarSign,
   habit: Heart,
   manual: Calendar,
+  google_calendar: Calendar,
 };
 
 export function UnifiedCalendarEvent({ event, top, height }: UnifiedCalendarEventProps) {
