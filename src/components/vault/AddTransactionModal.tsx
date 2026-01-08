@@ -38,6 +38,7 @@ type TransactionForm = {
   category: string;
   date: string;
   areaId: string;
+  projectId: string;
 };
 
 export function AddTransactionModal({ defaultAreaId, onClose }: AddTransactionModalProps) {
@@ -54,6 +55,7 @@ export function AddTransactionModal({ defaultAreaId, onClose }: AddTransactionMo
     category: "",
     date: format(new Date(), "yyyy-MM-dd"),
     areaId: defaultAreaId || "",
+    projectId: "",
   });
 
   // Fetch assets
@@ -84,6 +86,26 @@ export function AddTransactionModal({ defaultAreaId, onClose }: AddTransactionMo
     enabled: !!user?.id,
   });
 
+  // Fetch projects
+  const { data: projects = [] } = useQuery({
+    queryKey: ["projects", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("projects")
+        .select("id, title, area_id")
+        .eq("user_id", user?.id)
+        .order("title");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id,
+  });
+
+  // Filter projects by selected area
+  const filteredProjects = formData.areaId
+    ? projects.filter(p => p.area_id === formData.areaId)
+    : projects;
+
   // Create transaction mutation
   const createTransactionMutation = useMutation({
     mutationFn: async () => {
@@ -104,6 +126,7 @@ export function AddTransactionModal({ defaultAreaId, onClose }: AddTransactionMo
           category: formData.category || "General",
           date: formData.date,
           area_id: formData.areaId || null,
+          project_id: formData.projectId || null,
         })
         .select()
         .single();
@@ -191,7 +214,7 @@ export function AddTransactionModal({ defaultAreaId, onClose }: AddTransactionMo
             <Label>Area</Label>
             <Select
               value={formData.areaId}
-              onValueChange={(v) => setFormData({ ...formData, areaId: v === "none" ? "" : v })}
+              onValueChange={(v) => setFormData({ ...formData, areaId: v === "none" ? "" : v, projectId: "" })}
             >
               <SelectTrigger className="bg-secondary border-border">
                 <SelectValue placeholder="Select area (optional)" />
@@ -204,6 +227,27 @@ export function AddTransactionModal({ defaultAreaId, onClose }: AddTransactionMo
               </SelectContent>
             </Select>
           </div>
+
+          {/* Project Selection */}
+          {formData.areaId && filteredProjects.length > 0 && (
+            <div className="space-y-2">
+              <Label>Project (Optional)</Label>
+              <Select
+                value={formData.projectId}
+                onValueChange={(v) => setFormData({ ...formData, projectId: v === "none" ? "" : v })}
+              >
+                <SelectTrigger className="bg-secondary border-border">
+                  <SelectValue placeholder="Select project" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No project</SelectItem>
+                  {filteredProjects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.title}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Concept */}
           <div className="space-y-2">
