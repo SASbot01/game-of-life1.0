@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Lock, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Lock, Loader2, CheckCircle2, AlertCircle, User } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,8 +9,8 @@ import { toast } from 'sonner';
 import golLogo from '@/assets/gol-logo-new.png';
 
 export default function SetPassword() {
-    const [searchParams] = useSearchParams();
     const navigate = useNavigate();
+    const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [loading, setLoading] = useState(false);
@@ -26,12 +26,8 @@ export default function SetPassword() {
             const refreshToken = hashParams.get('refresh_token');
             const type = hashParams.get('type');
 
-            // Also check query params for backward compatibility
-            const token = searchParams.get('token');
-            const queryType = searchParams.get('type');
-
             // If we have access_token in hash, set the session
-            if (accessToken && type === 'invite') {
+            if (accessToken) {
                 try {
                     const { data, error } = await supabase.auth.setSession({
                         access_token: accessToken,
@@ -61,23 +57,21 @@ export default function SetPassword() {
                 return;
             }
 
-            // Fallback to query params
-            if (token && queryType === 'invite') {
-                setTokenValid(true);
-                setValidating(false);
-                return;
-            }
-
             // No valid token found
             setTokenValid(false);
             setValidating(false);
         };
 
         validateToken();
-    }, [searchParams]);
+    }, []);
 
     const handleSetPassword = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (!username.trim()) {
+            toast.error('Username is required');
+            return;
+        }
 
         if (password !== confirmPassword) {
             toast.error('Passwords do not match');
@@ -91,23 +85,48 @@ export default function SetPassword() {
 
         setLoading(true);
         try {
-            const { error } = await supabase.auth.updateUser({
+            // Get current session
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) {
+                throw new Error('No active session found');
+            }
+
+            // Update user password
+            const { error: passwordError } = await supabase.auth.updateUser({
                 password: password,
             });
 
-            if (error) throw error;
+            if (passwordError) throw passwordError;
 
-            toast.success('Password set successfully! Redirecting to login...');
+            // Create or update profile with username
+            const { error: profileError } = await supabase
+                .from('profiles')
+                .upsert({
+                    id: session.user.id,
+                    username: username.trim(),
+                    is_onboarded: false, // Will go through setup flow
+                }, {
+                    onConflict: 'id'
+                });
 
-            // Sign out to force login with new password
-            await supabase.auth.signOut();
+            if (profileError) throw profileError;
 
-            // Wait a moment then redirect to auth page
+            // Verify email automatically (since they came from invitation link)
+            const { error: verifyError } = await supabase.auth.updateUser({
+                email_confirm: true,
+            });
+
+            if (verifyError) console.warn('Email verification warning:', verifyError);
+
+            toast.success('Account activated! Redirecting to setup...');
+
+            // Wait a moment then redirect to setup page
             setTimeout(() => {
-                navigate('/auth');
-            }, 2000);
+                navigate('/setup');
+            }, 1500);
         } catch (error: any) {
-            toast.error(error.message || 'Failed to set password');
+            console.error('Setup error:', error);
+            toast.error(error.message || 'Failed to activate account');
         } finally {
             setLoading(false);
         }
@@ -166,15 +185,30 @@ export default function SetPassword() {
                             <img src={golLogo} alt="Game of Life" className="w-10 h-10 object-contain" />
                         </div>
                         <h1 className="text-3xl font-display text-foreground">
-                            Set Your <span className="text-primary text-glow-cyan">Password</span>
+                            Welcome to <span className="text-primary text-glow-cyan">Game of Life</span>
                         </h1>
                         <p className="text-muted-foreground mt-2">
-                            Create a password to activate your account
+                            Create your account to get started
                         </p>
                     </motion.div>
 
                     {/* Form */}
                     <form onSubmit={handleSetPassword} className="space-y-4">
+                        <div className="relative">
+                            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                            <Input
+                                type="text"
+                                placeholder="Username"
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value)}
+                                className="pl-10"
+                                required
+                                autoFocus
+                                maxLength={30}
+                            />
+                            <p className="text-xs text-muted-foreground mt-1">Choose a unique username</p>
+                        </div>
+
                         <div className="relative">
                             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                             <Input
@@ -185,7 +219,6 @@ export default function SetPassword() {
                                 className="pl-10"
                                 required
                                 minLength={6}
-                                autoFocus
                             />
                         </div>
 
@@ -211,7 +244,7 @@ export default function SetPassword() {
                             variant="cyber"
                             size="lg"
                             className="w-full"
-                            disabled={loading || password !== confirmPassword || password.length < 6}
+                            disabled={loading || !username.trim() || password !== confirmPassword || password.length < 6}
                         >
                             {loading ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
