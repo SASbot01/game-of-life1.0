@@ -20,18 +20,56 @@ export default function SetPassword() {
     // Validate token on mount
     useEffect(() => {
         const validateToken = async () => {
-            const token = searchParams.get('token');
-            const type = searchParams.get('type');
+            // Check for token in URL hash (Supabase format: #access_token=...)
+            const hashParams = new URLSearchParams(window.location.hash.substring(1));
+            const accessToken = hashParams.get('access_token');
+            const refreshToken = hashParams.get('refresh_token');
+            const type = hashParams.get('type');
 
-            if (!token || type !== 'invite') {
-                setTokenValid(false);
+            // Also check query params for backward compatibility
+            const token = searchParams.get('token');
+            const queryType = searchParams.get('type');
+
+            // If we have access_token in hash, set the session
+            if (accessToken && type === 'invite') {
+                try {
+                    const { data, error } = await supabase.auth.setSession({
+                        access_token: accessToken,
+                        refresh_token: refreshToken || '',
+                    });
+
+                    if (error) throw error;
+
+                    if (data.session) {
+                        setTokenValid(true);
+                        setValidating(false);
+                        return;
+                    }
+                } catch (error) {
+                    console.error('Session error:', error);
+                    setTokenValid(false);
+                    setValidating(false);
+                    return;
+                }
+            }
+
+            // Check if user already has a session (clicked link again)
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+                setTokenValid(true);
                 setValidating(false);
                 return;
             }
 
-            // Token is present, assume valid for now
-            // Supabase will validate it when we try to update the password
-            setTokenValid(true);
+            // Fallback to query params
+            if (token && queryType === 'invite') {
+                setTokenValid(true);
+                setValidating(false);
+                return;
+            }
+
+            // No valid token found
+            setTokenValid(false);
             setValidating(false);
         };
 
@@ -60,6 +98,9 @@ export default function SetPassword() {
             if (error) throw error;
 
             toast.success('Password set successfully! Redirecting to login...');
+
+            // Sign out to force login with new password
+            await supabase.auth.signOut();
 
             // Wait a moment then redirect to auth page
             setTimeout(() => {
