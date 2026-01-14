@@ -83,6 +83,7 @@ export default function SetPassword() {
             return;
         }
 
+
         setLoading(true);
         try {
             // Get current session
@@ -91,12 +92,19 @@ export default function SetPassword() {
                 throw new Error('No active session found');
             }
 
+            console.log('Setting password for user:', session.user.id);
+
             // Update user password
             const { error: passwordError } = await supabase.auth.updateUser({
                 password: password,
             });
 
-            if (passwordError) throw passwordError;
+            if (passwordError) {
+                console.error('Password error:', passwordError);
+                throw passwordError;
+            }
+
+            console.log('Password updated successfully');
 
             // Create or update profile with username
             const { error: profileError } = await supabase
@@ -109,21 +117,21 @@ export default function SetPassword() {
                     onConflict: 'id'
                 });
 
-            if (profileError) throw profileError;
+            if (profileError) {
+                console.error('Profile error:', profileError);
+                throw profileError;
+            }
 
-            // Verify email automatically (since they came from invitation link)
-            const { error: verifyError } = await supabase.auth.updateUser({
-                email_confirm: true,
-            });
+            console.log('Profile created successfully');
 
-            if (verifyError) console.warn('Email verification warning:', verifyError);
+            toast.success('✅ Account activated successfully!');
 
-            toast.success('Account activated! Redirecting to setup...');
-
-            // Wait a moment then redirect to setup page
+            // Force navigation after a short delay
+            console.log('Redirecting to /setup...');
             setTimeout(() => {
-                navigate('/setup');
-            }, 1500);
+                window.location.href = '/setup';
+            }, 1000);
+
         } catch (error: any) {
             console.error('Setup error:', error);
             toast.error(error.message || 'Failed to activate account');
